@@ -18,8 +18,7 @@ package controller
 
 import (
 	"context"
-	// "errors"
-	logr "github.com/go-logr/logr"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +35,6 @@ import (
 // ServiceFunctionReconciler reconciles a ServiceFunction object
 type ServiceFunctionReconciler struct {
 	client.Client
-	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
@@ -54,9 +52,7 @@ type ServiceFunctionReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *ServiceFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
-	log := r.Log.WithValues("servicefunction", req.NamespacedName)
-
+	log := logf.FromContext(ctx).WithValues("servicefunction", req.NamespacedName)
 	// Fetch the ServiceFunction instance
 	instance := &networkingv1alpha1.ServiceFunction{}
 	err := r.Get(ctx, req.NamespacedName, instance)
@@ -64,7 +60,9 @@ func (r *ServiceFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		log.Error(err, "unable to fetch ServiceFunction")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
+	log.Info("=========================================================\n" +
+		"-------------- Service Function Controller --------------\n" +
+		"=========================================================\n")
 	// Define the Pod spec based on the ServiceFunction spec
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

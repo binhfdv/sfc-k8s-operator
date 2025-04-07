@@ -19,7 +19,7 @@ package controller
 import (
 	"context"
 
-	logr "github.com/go-logr/logr"
+	// logr "github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +36,6 @@ import (
 // ServiceFunctionChainReconciler reconciles a ServiceFunctionChain object
 type ServiceFunctionChainReconciler struct {
 	client.Client
-	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
@@ -54,8 +53,9 @@ type ServiceFunctionChainReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
-	log := r.Log.WithValues("servicefunctionchain", req.NamespacedName)
+	// _ = logf.FromContext(ctx)
+	// log := r.Log.WithValues("servicefunctionchain", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("servicefunctionchain", req.NamespacedName)
 
 	// Fetch the ServiceFunctionChain instance
 	instance := &networkingv1alpha1.ServiceFunctionChain{}
@@ -64,6 +64,9 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 		log.Error(err, "unable to fetch ServiceFunctionChain")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	log.Info("\n=========================================================\n" +
+		"------------ Service Function Chain Controller ----------\n" +
+		"=========================================================\n")
 
 	// Check the status of the functions in the chain
 	var deployedFunctions []string

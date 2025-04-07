@@ -20,7 +20,7 @@ import (
 	"context"
 	logr "github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
+	// "k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -49,55 +49,56 @@ type SFCPolicyReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *SFCPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
-	log := r.Log.WithValues("sfcpolicy", req.NamespacedName)
+	log := logf.FromContext(ctx).WithValues("sfcpolicy", req.NamespacedName)
 
-	// Fetch the SFCPolicy instance
-	instance := &networkingv1alpha1.SFCPolicy{}
-	err := r.Get(ctx, req.NamespacedName, instance)
-	if err != nil {
-		log.Error(err, "unable to fetch SFCPolicy")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
+	// // Fetch the SFCPolicy instance
+	// instance := &networkingv1alpha1.SFCPolicy{}
+	// err := r.Get(ctx, req.NamespacedName, instance)
+	// if err != nil {
+	// 	log.Error(err, "unable to fetch SFCPolicy")
+	// 	return ctrl.Result{}, client.IgnoreNotFound(err)
+	// }
+	log.Info("\n=========================================================\n" +
+		"------------------ SFC Policy Controller ----------------\n" +
+		"=========================================================\n")
+	// // If the policy is already applied, we don't need to do anything further
+	// if instance.Status.Applied {
+	// 	log.Info("SFCPolicy already applied")
+	// 	return ctrl.Result{}, nil
+	// }
 
-	// If the policy is already applied, we don't need to do anything further
-	if instance.Status.Applied {
-		log.Info("SFCPolicy already applied")
-		return ctrl.Result{}, nil
-	}
+	// // Fetch the related ServiceFunctionChain
+	// sfChain := &networkingv1alpha1.ServiceFunctionChain{}
+	// err = r.Get(ctx, types.NamespacedName{Name: instance.Spec.ApplyChain, Namespace: req.Namespace}, sfChain)
+	// if err != nil {
+	// 	log.Error(err, "unable to fetch ServiceFunctionChain", "chain", instance.Spec.ApplyChain)
+	// 	return ctrl.Result{}, err
+	// }
 
-	// Fetch the related ServiceFunctionChain
-	sfChain := &networkingv1alpha1.ServiceFunctionChain{}
-	err = r.Get(ctx, types.NamespacedName{Name: instance.Spec.ApplyChain, Namespace: req.Namespace}, sfChain)
-	if err != nil {
-		log.Error(err, "unable to fetch ServiceFunctionChain", "chain", instance.Spec.ApplyChain)
-		return ctrl.Result{}, err
-	}
+	// // Log the ServiceFunctionChain status details for debugging purposes
+	// log.Info("ServiceFunctionChain status", "ready", sfChain.Status.Ready, "deployedPods", len(sfChain.Status.DeployedPods))
 
-	// Log the ServiceFunctionChain status details for debugging purposes
-	log.Info("ServiceFunctionChain status", "ready", sfChain.Status.Ready, "deployedPods", len(sfChain.Status.DeployedPods))
+	// // Check the match criteria (simple example)
+	// if sfChain.Status.Ready && len(sfChain.Status.DeployedPods) > 0 {
+	// 	// Policy is successfully applied
+	// 	instance.Status.Applied = true
+	// 	instance.Status.Reason = "Policy applied successfully"
+	// 	log.Info("Policy applied successfully", "chain", instance.Spec.ApplyChain)
+	// } else {
+	// 	// Policy application failed due to missing functions or chain not ready
+	// 	instance.Status.Applied = false
+	// 	instance.Status.Reason = "ServiceFunctionChain not ready"
+	// 	log.Info("ServiceFunctionChain not ready", "chain", instance.Spec.ApplyChain)
+	// }
 
-	// Check the match criteria (simple example)
-	if sfChain.Status.Ready && len(sfChain.Status.DeployedPods) > 0 {
-		// Policy is successfully applied
-		instance.Status.Applied = true
-		instance.Status.Reason = "Policy applied successfully"
-		log.Info("Policy applied successfully", "chain", instance.Spec.ApplyChain)
-	} else {
-		// Policy application failed due to missing functions or chain not ready
-		instance.Status.Applied = false
-		instance.Status.Reason = "ServiceFunctionChain not ready"
-		log.Info("ServiceFunctionChain not ready", "chain", instance.Spec.ApplyChain)
-	}
+	// // Update the SFCPolicy status
+	// err = r.Status().Update(ctx, instance)
+	// if err != nil {
+	// 	log.Error(err, "unable to update SFCPolicy status")
+	// 	return ctrl.Result{}, err
+	// }
 
-	// Update the SFCPolicy status
-	err = r.Status().Update(ctx, instance)
-	if err != nil {
-		log.Error(err, "unable to update SFCPolicy status")
-		return ctrl.Result{}, err
-	}
-
-	log.Info("Reconciliation complete", "status", instance.Status)
+	// log.Info("Reconciliation complete", "status", instance.Status)
 
 	return ctrl.Result{}, nil
 }
