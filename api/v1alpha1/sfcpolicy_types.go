@@ -25,8 +25,8 @@ import (
 
 // SFCPolicySpec defines the desired state of SFCPolicy.
 type SFCPolicySpec struct {
-	Match      TrafficMatch `json:"match"`
-	ApplyChain string       `json:"applyChain"` // name of the ServiceFunctionChain
+	// Match      TrafficMatch `json:"match"`
+	ApplyChain string `json:"applyChain"` // name of the ServiceFunctionChain
 }
 
 // SFCPolicyStatus defines the observed state of SFCPolicy.

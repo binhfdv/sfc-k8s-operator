@@ -4,14 +4,18 @@ metadata:
   labels:
     app.kubernetes.io/name: sfc-k8s-operator
     app.kubernetes.io/managed-by: kustomize
+    sfc.comnets.io/name: sfc-service-function-chain
   name: servicefunctionchain-sample
 spec:
+  forwarder:
+    image: ddocker122/cat_breed:latest
+    ports:
+      - containerPort: 80
+    nodeSelector:
+    
   functions:
-    - sf-firewall
-    - sf-dpi
-    - sf-nat
-  match:
-    ipProto: 6  # TCP
-    dstPort: 8080
+    - servicefunction-sample-1
+    - servicefunction-sample-2
   ingressInterface: eth0
   egressInterface: eth0
+  

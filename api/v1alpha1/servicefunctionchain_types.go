@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,21 +26,24 @@ import (
 
 // ServiceFunctionChainSpec defines the desired state of ServiceFunctionChain.
 type ServiceFunctionChainSpec struct {
-	Functions        []string     `json:"functions"` // list of ServiceFunction names
-	IngressInterface string       `json:"ingressInterface,omitempty"`
-	EgressInterface  string       `json:"egressInterface,omitempty"`
-	Match            TrafficMatch `json:"match,omitempty"`
+	Functions        []string       `json:"functions"` // list of ServiceFunction names
+	IngressInterface string         `json:"ingressInterface,omitempty"`
+	EgressInterface  string         `json:"egressInterface,omitempty"`
+	Forwarder        TrafficForward `json:"forwarder,omitempty"`
 }
 
-type TrafficMatch struct {
-	IPProto int    `json:"ipProto,omitempty"`
-	DstPort int    `json:"dstPort,omitempty"`
-	SrcIP   string `json:"srcIp,omitempty"`
+type TrafficForward struct {
+	Image        string                      `json:"image"`
+	Resources    corev1.ResourceRequirements `json:"resources,omitempty"`
+	Ports        []corev1.ContainerPort      `json:"ports,omitempty"`
+	NodeSelector map[string]string           `json:"nodeSelector,omitempty"`
 }
 
 // ServiceFunctionChainStatus defines the observed state of ServiceFunctionChain.
 type ServiceFunctionChainStatus struct {
 	Ready        bool        `json:"ready"`
+	PodName      string      `json:"podName,omitempty"`
+	ServiceIP    string      `json:"serviceIP,omitempty"`
 	DeployedPods []string    `json:"deployedPods,omitempty"`
 	LastUpdated  metav1.Time `json:"lastUpdated,omitempty"`
 }

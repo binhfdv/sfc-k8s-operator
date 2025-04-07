@@ -68,8 +68,9 @@ func (r *ServiceFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Define the Pod spec based on the ServiceFunction spec
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-pod", // Add a unique identifier
+			Name:      instance.Name, // Add a unique identifier
 			Namespace: req.Namespace,
+			Labels:    instance.Labels,
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{

@@ -4,9 +4,10 @@ metadata:
   labels:
     app.kubernetes.io/name: sfc-k8s-operator
     app.kubernetes.io/managed-by: kustomize
-  name: servicefunction-sample
+    sfc.comnets.io/name: sfc-service-function
+  name: servicefunction-sample-1
 spec:
-  image: myregistry.io/firewall:latest
+  image: ddocker122/cat_breed:latest
   resources:
     limits:
       cpu: "500m"
@@ -15,4 +16,22 @@ spec:
     - containerPort: 80
   nodeSelector:
     # sfc-role: node-a
-  
+---
+apiVersion: networking.sfc.comnets.com/v1alpha1
+kind: ServiceFunction
+metadata:
+  labels:
+    app.kubernetes.io/name: sfc-k8s-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: servicefunction-sample-2
+spec:
+  image: ddocker122/dog_breed:latest
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  ports:
+    - containerPort: 80
+  nodeSelector:
+    # sfc-role: node-b
+

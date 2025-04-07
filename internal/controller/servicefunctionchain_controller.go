@@ -20,7 +20,9 @@ import (
 	"context"
 
 	logr "github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -96,7 +98,65 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Reconciliation complete", "deployedFunctions", deployedFunctions)
+	log.Info("Reconciliation completed: Service functions are ready.", "deployedFunctions", deployedFunctions)
+
+	/////////////////////////////////
+	// deploy forwarder
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.Name, // Add a unique identifier
+			Namespace: req.Namespace,
+			Labels:    instance.Labels,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  instance.Name,
+					Image: instance.Spec.Forwarder.Image,
+					Ports: instance.Spec.Forwarder.Ports,
+				},
+			},
+			NodeSelector: instance.Spec.Forwarder.NodeSelector,
+		},
+	}
+
+	// Check if the pod already exists
+	foundPod := &corev1.Pod{}
+	err = r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, foundPod)
+	if err != nil && errors.IsNotFound(err) {
+		// Pod doesn't exist, create it
+		log.Info("Creating pod", "pod", pod.Name)
+		err = r.Create(ctx, pod)
+		if err != nil {
+			log.Error(err, "unable to create pod", "pod", pod.Name)
+			return ctrl.Result{}, err
+		}
+	} else if err != nil {
+		// Error checking pod existence
+		log.Error(err, "unable to fetch pod", "pod", pod.Name)
+		return ctrl.Result{}, err
+	} else {
+		// Pod already exists, update status or skip creation
+		log.Info("Pod already exists", "pod", pod.Name)
+	}
+
+	// Check Pod readiness before updating the ServiceFunction status
+	// You can check the pod's status or readiness using the `foundPod` object
+	if foundPod.Status.Phase == corev1.PodRunning {
+		// Update the ServiceFunction status
+		instance.Status.PodName = pod.Name
+		instance.Status.Ready = true // You can add more checks here for pod readiness
+	} else {
+		instance.Status.Ready = false
+	}
+
+	// Update the status of the ServiceFunction
+	err = r.Status().Update(ctx, instance)
+	if err != nil {
+		log.Error(err, "unable to update ServiceFunctionChain status")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
