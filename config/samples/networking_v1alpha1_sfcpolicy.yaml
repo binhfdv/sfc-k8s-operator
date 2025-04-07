@@ -1,0 +1,12 @@
+apiVersion: networking.sfc.comnets.com/v1alpha1
+kind: SFCPolicy
+metadata:
+  labels:
+    app.kubernetes.io/name: sfc-k8s-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: sfcpolicy-sample
+spec:
+  # match:
+  #   dstPort: 80
+  #   srcIp: 10.0.0.0/24
+  # applyChain: servicefunctionchain-sample

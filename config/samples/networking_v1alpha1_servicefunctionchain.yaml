@@ -1,0 +1,17 @@
+apiVersion: networking.sfc.comnets.com/v1alpha1
+kind: ServiceFunctionChain
+metadata:
+  labels:
+    app.kubernetes.io/name: sfc-k8s-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: servicefunctionchain-sample
+spec:
+  functions:
+    - sf-firewall
+    - sf-dpi
+    - sf-nat
+  match:
+    ipProto: 6  # TCP
+    dstPort: 8080
+  ingressInterface: eth0
+  egressInterface: eth0
