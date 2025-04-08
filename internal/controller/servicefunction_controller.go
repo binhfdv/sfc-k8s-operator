@@ -60,7 +60,7 @@ func (r *ServiceFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		log.Error(err, "unable to fetch ServiceFunction")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("=========================================================\n" +
+	log.Info("\n=========================================================\n" +
 		"-------------- Service Function Controller --------------\n" +
 		"=========================================================\n")
 	// Define the Pod spec based on the ServiceFunction spec

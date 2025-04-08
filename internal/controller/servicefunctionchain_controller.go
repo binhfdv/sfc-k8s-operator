@@ -29,6 +29,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	networkingv1alpha1 "github.com/binhfdv/sfc-k8s-operator/api/v1alpha1"
 )
@@ -61,55 +66,96 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 	instance := &networkingv1alpha1.ServiceFunctionChain{}
 	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
-		log.Error(err, "unable to fetch ServiceFunctionChain")
+		log.Error(err, "unable to fetch Service Function Chain")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log.Info("\n=========================================================\n" +
 		"------------ Service Function Chain Controller ----------\n" +
 		"=========================================================\n")
 
-	// Check the status of the functions in the chain
-	var deployedFunctions []string
-	for _, functionName := range instance.Spec.Functions {
-		sf := &networkingv1alpha1.ServiceFunction{}
-		err := r.Get(ctx, types.NamespacedName{Name: functionName, Namespace: req.Namespace}, sf)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("ServiceFunction not found", "servicefunction", functionName)
-			} else {
-				log.Error(err, "unable to fetch ServiceFunction", "servicefunction", functionName)
-			}
-			continue // Proceed to the next function if this one fails to fetch
-		}
-
-		// Add the function name to deployed list if it is ready
-		if sf.Status.Ready {
-			deployedFunctions = append(deployedFunctions, functionName)
-		} else {
-			log.Info("ServiceFunction not ready", "servicefunction", functionName)
-		}
-	}
-
-	// Update the ServiceFunctionChain status with the list of deployed service functions
-	instance.Status.DeployedPods = deployedFunctions
-	instance.Status.Ready = len(deployedFunctions) == len(instance.Spec.Functions) // All functions should be ready
-
-	// Update the status of the ServiceFunctionChain resource
-	err = r.Status().Update(ctx, instance)
+	deployedFunctions, err := r.checkServiceFunctionsReady(ctx, req.Namespace, instance.Spec.Functions)
 	if err != nil {
-		log.Error(err, "unable to update ServiceFunctionChain status")
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Reconciliation completed: Service functions are ready.", "deployedFunctions", deployedFunctions)
+	foundPod, err := r.createOrUpdateForwarderPod(ctx, instance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-	/////////////////////////////////
-	// deploy forwarder
+	// Check Pod readiness before updating the Service Function Chain status
+	// You can check the pod's status or readiness using the `foundPod` object
+	if foundPod.Status.Phase == corev1.PodRunning && len(deployedFunctions) == len(instance.Spec.Functions) {
+		// Update the Service Function Chain status
+		instance.Status.PodName = instance.Name // pod.name
+		instance.Status.Ready = true            // You can add more checks here for pod readiness
+	} else {
+		instance.Status.Ready = false
+	}
+
+	// Update the status of the Service Function Chain
+	err = r.Status().Update(ctx, instance)
+	if err != nil {
+		log.Error(err, "unable to update Service Function Chain status")
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *ServiceFunctionChainReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&networkingv1alpha1.ServiceFunctionChain{}).
+		Watches(
+			&networkingv1alpha1.ServiceFunction{},
+			handler.EnqueueRequestsFromMapFunc(r.mapServiceFunctionToChains),
+		).
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(r.mapPodToChains),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Named("servicefunctionchain").
+		Complete(r)
+}
+
+func (r *ServiceFunctionChainReconciler) checkServiceFunctionsReady(ctx context.Context, namespace string, functionNames []string) ([]string, error) {
+	log := logf.FromContext(ctx).WithValues("servicefunctionchain", namespace)
+
+	var deployedFunctions []string
+
+	for _, functionName := range functionNames {
+		sf := &networkingv1alpha1.ServiceFunction{}
+		err := r.Get(ctx, types.NamespacedName{Name: functionName, Namespace: namespace}, sf)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Service Function not found", "servicefunction", functionName)
+			} else {
+				log.Error(err, "unable to fetch Service Function", "servicefunction", functionName)
+				return nil, err
+			}
+			continue
+		}
+
+		if sf.Status.Ready {
+			deployedFunctions = append(deployedFunctions, functionName)
+		} else {
+			log.Info("Service Function not ready", "servicefunction", functionName, "status", sf.Status)
+		}
+	}
+
+	return deployedFunctions, nil
+}
+
+
+func (r *ServiceFunctionChainReconciler) createOrUpdateForwarderPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunctionChain,) (*corev1.Pod, error) {
+	log := logf.FromContext(ctx).WithValues("servicefunctionchain", instance.Namespace)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name, // Add a unique identifier
-			Namespace: req.Namespace,
+			Name:      instance.Name,
+			Namespace: instance.Namespace,
 			Labels:    instance.Labels,
 		},
 		Spec: corev1.PodSpec{
@@ -124,50 +170,71 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 		},
 	}
 
-	// Check if the pod already exists
 	foundPod := &corev1.Pod{}
-	err = r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, foundPod)
+	err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, foundPod)
 	if err != nil && errors.IsNotFound(err) {
-		// Pod doesn't exist, create it
-		log.Info("Creating pod", "pod", pod.Name)
-		err = r.Create(ctx, pod)
-		if err != nil {
-			log.Error(err, "unable to create pod", "pod", pod.Name)
-			return ctrl.Result{}, err
+		log.Info("Creating FORWARDER pod", "pod", pod.Name)
+		if err := r.Create(ctx, pod); err != nil {
+			log.Error(err, "unable to create FORWARDER pod", "pod", pod.Name)
+			return nil, err
 		}
+		return pod, nil
 	} else if err != nil {
-		// Error checking pod existence
-		log.Error(err, "unable to fetch pod", "pod", pod.Name)
-		return ctrl.Result{}, err
-	} else {
-		// Pod already exists, update status or skip creation
-		log.Info("Pod already exists", "pod", pod.Name)
+		log.Error(err, "unable to fetch FORWARDER pod", "pod", pod.Name)
+		return nil, err
 	}
 
-	// Check Pod readiness before updating the ServiceFunction status
-	// You can check the pod's status or readiness using the `foundPod` object
-	if foundPod.Status.Phase == corev1.PodRunning {
-		// Update the ServiceFunction status
-		instance.Status.PodName = pod.Name
-		instance.Status.Ready = true // You can add more checks here for pod readiness
-	} else {
-		instance.Status.Ready = false
-	}
-
-	// Update the status of the ServiceFunction
-	err = r.Status().Update(ctx, instance)
-	if err != nil {
-		log.Error(err, "unable to update ServiceFunctionChain status")
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{}, nil
+	log.Info("FORWARDER pod already exists", "pod", foundPod.Name)
+	return foundPod, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *ServiceFunctionChainReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&networkingv1alpha1.ServiceFunctionChain{}).
-		Named("servicefunctionchain").
-		Complete(r)
+
+func (r *ServiceFunctionChainReconciler) mapServiceFunctionToChains(sf *networkingv1alpha1.ServiceFunction) ([]reconcile.Request, error) {
+	ctx := context.Background()
+	var result []reconcile.Request
+
+	// List all ServiceFunctionChains in the same namespace
+	var sfcList networkingv1alpha1.ServiceFunctionChainList
+	if err := r.List(ctx, &sfcList, client.InNamespace(sf.Namespace)); err != nil {
+		// log error but return empty so we don't panic in mapping
+		return result
+	}
+
+	for _, sfc := range sfcList.Items {
+		for _, fn := range sfc.Spec.Functions {
+			if fn == sf.Name {
+				result = append(result, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      sfc.Name,
+						Namespace: sfc.Namespace,
+					},
+				})
+				break // no need to check other functions
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func (r *ServiceFunctionChainReconciler) mapPodToChains(obj client.Object) []ctrl.Request {
+	pod, ok := obj.(*corev1.Pod)
+	if !ok {
+		return nil
+	}
+
+	ctx := context.Background()
+	var requests []ctrl.Request
+
+	sfc := &networkingv1alpha1.ServiceFunctionChain{}
+	err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, sfc)
+	if err == nil {
+		requests = append(requests, ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      sfc.Name,
+				Namespace: sfc.Namespace,
+			},
+		})
+	}
+	return requests
 }
