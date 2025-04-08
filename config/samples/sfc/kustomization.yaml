@@ -1,6 +1,5 @@
 ## Append samples of your project ##
 resources:
-- networking_v1alpha1_servicefunction.yaml
 - networking_v1alpha1_servicefunctionchain.yaml
 - networking_v1alpha1_sfcpolicy.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
