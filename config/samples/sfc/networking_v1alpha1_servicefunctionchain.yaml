@@ -7,10 +7,10 @@ metadata:
     sfc.comnets.io/name: sfc-service-function-chain
   name: servicefunctionchain-sample
 spec:
-  forwarder:
-    image: ddocker122/cat_breed:latest
+  ingress:
+    image: ddocker122/ingress:latest
     ports:
-      - containerPort: 80
+      - containerPort: 5000
     nodeSelector:
     
   functions:

@@ -77,7 +77,7 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	foundPod, err := r.createOrUpdateForwarderPod(ctx, instance)
+	foundPod, err := r.createOrUpdateINGRESSPod(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -107,11 +107,11 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 	}
 
 	if foundPod.Status.Phase == corev1.PodFailed || foundPod.Status.Phase == corev1.PodUnknown {
-		log.Error(nil, "FORWARDER Pod failed or unknown, recreating", "status", foundPod.Status.Phase)
+		log.Error(nil, "INGRESS Pod failed or unknown, recreating", "status", foundPod.Status.Phase)
 
 		err := r.Delete(ctx, foundPod)
 		if err != nil {
-			log.Error(err, "failed to delete unhealthy FORWARDER pod")
+			log.Error(err, "failed to delete unhealthy INGRESS pod")
 			return ctrl.Result{}, err
 		}
 
@@ -183,8 +183,18 @@ func (r *ServiceFunctionChainReconciler) checkServiceFunctionsReady(ctx context.
 	return deployedFunctions, nil
 }
 
-func (r *ServiceFunctionChainReconciler) createOrUpdateForwarderPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunctionChain) (*corev1.Pod, error) {
+func (r *ServiceFunctionChainReconciler) createOrUpdateINGRESSPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunctionChain) (*corev1.Pod, error) {
 	log := logf.FromContext(ctx).WithValues("servicefunctionchain", instance.Namespace)
+
+	firstSFName := instance.Spec.Functions[0]
+	firstSvc := &corev1.Service{}
+	err := r.Get(ctx, types.NamespacedName{Name: firstSFName, Namespace: instance.Namespace}, firstSvc)
+	if err != nil {
+		log.Error(err, "Failed to fetch first Service Function's service")
+		return nil, err
+	}
+	// firstSFIP := firstSvc.Spec.ClusterIP
+
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -196,11 +206,21 @@ func (r *ServiceFunctionChainReconciler) createOrUpdateForwarderPod(ctx context.
 			Containers: []corev1.Container{
 				{
 					Name:  instance.Name,
-					Image: instance.Spec.Forwarder.Image,
-					Ports: instance.Spec.Forwarder.Ports,
+					Image: instance.Spec.Ingress.Image,
+					Ports: instance.Spec.Ingress.Ports,
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TARGET_HOST",
+							Value: fmt.Sprintf("%s.%s.svc.cluster.local", firstSFName, instance.Namespace),
+						},
+						{
+							Name:  "TARGET_PORT",
+							Value: "80", // or whatever port your service function listens on
+						},
+					},
 				},
 			},
-			NodeSelector: instance.Spec.Forwarder.NodeSelector,
+			NodeSelector: instance.Spec.Ingress.NodeSelector,
 		},
 	}
 
@@ -211,22 +231,22 @@ func (r *ServiceFunctionChainReconciler) createOrUpdateForwarderPod(ctx context.
 	}
 
 	foundPod := &corev1.Pod{}
-	err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, foundPod)
+	err1 := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, foundPod)
 
-	if err != nil && errors.IsNotFound(err) {
-		log.Info("Creating FORWARDER pod", "pod", pod.Name)
+	if err1 != nil && errors.IsNotFound(err1) {
+		log.Info("Creating INGRESS pod", "pod", pod.Name)
 		if err := r.Create(ctx, pod); err != nil {
-			log.Error(err, "unable to create FORWARDER pod", "pod", pod.Name)
+			log.Error(err, "unable to create INGRESS pod", "pod", pod.Name)
 			return nil, err
 		}
 
 		return pod, nil
 
-	} else if err != nil {
-		log.Error(err, "unable to fetch FORWARDER pod", "pod", pod.Name)
-		return nil, err
+	} else if err1 != nil {
+		log.Error(err1, "unable to fetch INGRESS pod", "pod", pod.Name)
+		return nil, err1
 	}
 
-	log.Info("FORWARDER pod already exists", "pod", foundPod.Name)
+	log.Info("INGRESS pod already exists", "pod", foundPod.Name)
 	return foundPod, nil
 }

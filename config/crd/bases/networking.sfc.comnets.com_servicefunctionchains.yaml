@@ -42,7 +42,11 @@ spec:
             properties:
               egressInterface:
                 type: string
-              forwarder:
+              functions:
+                items:
+                  type: string
+                type: array
+              ingress:
                 properties:
                   image:
                     type: string
@@ -151,10 +155,6 @@ spec:
                 required:
                 - image
                 type: object
-              functions:
-                items:
-                  type: string
-                type: array
               ingressInterface:
                 type: string
             required:

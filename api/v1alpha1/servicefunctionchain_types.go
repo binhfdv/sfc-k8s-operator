@@ -29,7 +29,7 @@ type ServiceFunctionChainSpec struct {
 	Functions        []string       `json:"functions"` // list of ServiceFunction names
 	IngressInterface string         `json:"ingressInterface,omitempty"`
 	EgressInterface  string         `json:"egressInterface,omitempty"`
-	Forwarder        TrafficForward `json:"forwarder,omitempty"`
+	Ingress          TrafficForward `json:"ingress,omitempty"`
 }
 
 type TrafficForward struct {

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-service
+  namespace: default
+spec:
+  clusterIP: 10.96.10.30
+  selector:
+    sfc.comnets.io/name: sfc-service-function-chain  # match your INGRESS pod labels
+  ports:
+  - port: 5000
+    targetPort: 5000
+    nodePort: 30996
+  type: NodePort  # or LoadBalancer if you're using a cloud provider

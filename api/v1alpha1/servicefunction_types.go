@@ -29,7 +29,13 @@ type ServiceFunctionSpec struct {
 	Image        string                      `json:"image"`
 	Resources    corev1.ResourceRequirements `json:"resources,omitempty"`
 	Ports        []corev1.ContainerPort      `json:"ports,omitempty"`
+	NextSF       NextFunction                `json:"nextsf,omitempty"`
 	NodeSelector map[string]string           `json:"nodeSelector,omitempty"`
+}
+
+type NextFunction struct {
+	Name  string                 `json:"name"`
+	Ports []corev1.ContainerPort `json:"ports,omitempty"`
 }
 
 // ServiceFunctionStatus defines the observed state of ServiceFunction.
