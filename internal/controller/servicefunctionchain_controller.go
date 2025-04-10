@@ -18,8 +18,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
-
 	// logr "github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +30,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	networkingv1alpha1 "github.com/binhfdv/sfc-k8s-operator/api/v1alpha1"
 )
@@ -57,7 +59,7 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 	// _ = logf.FromContext(ctx)
 	// log := r.Log.WithValues("servicefunctionchain", req.NamespacedName)
 	log := logf.FromContext(ctx).WithValues("servicefunctionchain", req.NamespacedName)
-
+	log.Info("Reconcile called")
 	// Fetch the ServiceFunctionChain instance
 	instance := &networkingv1alpha1.ServiceFunctionChain{}
 	err := r.Get(ctx, req.NamespacedName, instance)
@@ -80,20 +82,32 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 	}
 
 	// Watch forwarder pod's status
-	if foundPod.Status.Phase != corev1.PodRunning {
-		log.Error(nil, "FORWARDER Pod is not running", "status", foundPod.Status.Phase)
+	// if foundPod.Status.Phase != corev1.PodRunning { // check this
 
-		// Delete and recreate the pod
-		err := r.Delete(ctx, foundPod)
-		if err != nil {
-			log.Error(err, "failed to delete unhealthy FORWARDER pod")
-			return ctrl.Result{}, err
-		}
+	// 	for _, cs := range foundPod.Status.ContainerStatuses {
+	// 		log.Info("===== in for loop ====")
+	// 		if cs.State.Waiting != nil {
+	// 			reason := cs.State.Waiting.Reason
+	// 			log.Info("Pod container is waiting", "reason", reason, "message", cs.State.Waiting.Message)
 
-		// Requeue to recreate the pod
-		log.Info("FORWARDER Pod deleted, requeuing to recreate it")
-		return ctrl.Result{Requeue: true}, nil
-	}
+	// 			if reason == "ContainerCreating" || reason == "ImagePullBackOff" || reason == "ErrImagePull" {
+	// 				log.Info("Pod is still initializing. Will let event trigger next reconcile.")
+	// 				return ctrl.Result{}, nil
+	// 			}
+	// 		}
+	// 	}
+
+	// 	// If not in a recoverable state, delete
+	// 	log.Error(nil, "hey FORWARDER Pod is not running and not recovering", "status", foundPod.Status.Phase)
+	// 	err := r.Delete(ctx, foundPod)
+	// 	if err != nil {
+	// 		log.Error(err, "failed to delete unhealthy FORWARDER pod")
+	// 		return ctrl.Result{}, err
+	// 	}
+
+	// 	log.Info("FORWARDER Pod deleted, requeuing to recreate it")
+	// 	return ctrl.Result{Requeue: true}, nil
+	// }
 
 	// Check Pod readiness before updating the Service Function Chain status
 	isReady := false
@@ -104,10 +118,19 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 		}
 	}
 
-	if !isReady && foundPod.Status.Phase == corev1.PodRunning {
-		// You can decide to wait or delete
-		log.Info("Pod is running but not ready. Requeuing...")
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	// if !isReady && foundPod.Status.Phase == corev1.PodRunning {
+	// 	// You can decide to wait or delete
+	// 	log.Info("Pod is running but not ready. Requeuing...")
+	// 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	// }
+	fmt.Println("======== pod status: ", foundPod.Status)
+	fmt.Println("======== pod phase: ", foundPod.Status.Phase)
+	fmt.Println("======== pod conditions: ", foundPod.Status.Conditions)
+	fmt.Println("======== pod: ", foundPod.Labels)
+
+	if foundPod.Status.Phase == corev1.PodPending {
+		log.Info("Pod is still pending. Waiting for containers to start...")
+		return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
 	}
 
 	if foundPod.Status.Phase == corev1.PodFailed || foundPod.Status.Phase == corev1.PodUnknown {
@@ -208,15 +231,24 @@ func (r *ServiceFunctionChainReconciler) createOrUpdateForwarderPod(ctx context.
 		},
 	}
 
+	// Set the owner reference so the controller is notified on pod changes (create, delete, update)
+	if err := controllerutil.SetControllerReference(instance, pod, r.Scheme); err != nil {
+		log.Error(err, "unable to set controller reference on pod")
+		return nil, err
+	}
+
 	foundPod := &corev1.Pod{}
 	err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, foundPod)
+
 	if err != nil && errors.IsNotFound(err) {
 		log.Info("Creating FORWARDER pod", "pod", pod.Name)
 		if err := r.Create(ctx, pod); err != nil {
 			log.Error(err, "unable to create FORWARDER pod", "pod", pod.Name)
 			return nil, err
 		}
+
 		return pod, nil
+
 	} else if err != nil {
 		log.Error(err, "unable to fetch FORWARDER pod", "pod", pod.Name)
 		return nil, err
