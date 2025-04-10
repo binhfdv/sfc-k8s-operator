@@ -60,6 +60,7 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 	// log := r.Log.WithValues("servicefunctionchain", req.NamespacedName)
 	log := logf.FromContext(ctx).WithValues("servicefunctionchain", req.NamespacedName)
 	log.Info("Reconcile called")
+
 	// Fetch the ServiceFunctionChain instance
 	instance := &networkingv1alpha1.ServiceFunctionChain{}
 	err := r.Get(ctx, req.NamespacedName, instance)
@@ -80,34 +81,6 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
-	// Watch forwarder pod's status
-	// if foundPod.Status.Phase != corev1.PodRunning { // check this
-
-	// 	for _, cs := range foundPod.Status.ContainerStatuses {
-	// 		log.Info("===== in for loop ====")
-	// 		if cs.State.Waiting != nil {
-	// 			reason := cs.State.Waiting.Reason
-	// 			log.Info("Pod container is waiting", "reason", reason, "message", cs.State.Waiting.Message)
-
-	// 			if reason == "ContainerCreating" || reason == "ImagePullBackOff" || reason == "ErrImagePull" {
-	// 				log.Info("Pod is still initializing. Will let event trigger next reconcile.")
-	// 				return ctrl.Result{}, nil
-	// 			}
-	// 		}
-	// 	}
-
-	// 	// If not in a recoverable state, delete
-	// 	log.Error(nil, "hey FORWARDER Pod is not running and not recovering", "status", foundPod.Status.Phase)
-	// 	err := r.Delete(ctx, foundPod)
-	// 	if err != nil {
-	// 		log.Error(err, "failed to delete unhealthy FORWARDER pod")
-	// 		return ctrl.Result{}, err
-	// 	}
-
-	// 	log.Info("FORWARDER Pod deleted, requeuing to recreate it")
-	// 	return ctrl.Result{Requeue: true}, nil
-	// }
 
 	// Check Pod readiness before updating the Service Function Chain status
 	isReady := false
