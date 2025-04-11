@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	networkingv1alpha1 "github.com/binhfdv/sfc-k8s-operator/api/v1alpha1"
@@ -186,15 +187,15 @@ func (r *ServiceFunctionChainReconciler) checkServiceFunctionsReady(ctx context.
 func (r *ServiceFunctionChainReconciler) createOrUpdateINGRESSPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunctionChain) (*corev1.Pod, error) {
 	log := logf.FromContext(ctx).WithValues("servicefunctionchain", instance.Namespace)
 
-	firstSFName := instance.Spec.Functions[0]
-	firstSvc := &corev1.Service{}
-	err := r.Get(ctx, types.NamespacedName{Name: firstSFName, Namespace: instance.Namespace}, firstSvc)
+	// Fetch the first service function's service info (IP and Port)
+	clusterIP, port, err := r.getFirstFunctionServiceInfo(ctx, instance)
 	if err != nil {
-		log.Error(err, "Failed to fetch first Service Function's service")
+		log.Error(err, "failed to get first Service Function's service info")
 		return nil, err
 	}
-	// firstSFIP := firstSvc.Spec.ClusterIP
 
+	// Convert the port to string
+	portStr := fmt.Sprintf("%d", port)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -211,11 +212,11 @@ func (r *ServiceFunctionChainReconciler) createOrUpdateINGRESSPod(ctx context.Co
 					Env: []corev1.EnvVar{
 						{
 							Name:  "TARGET_HOST",
-							Value: fmt.Sprintf("%s.%s.svc.cluster.local", firstSFName, instance.Namespace),
+							Value: clusterIP,
 						},
 						{
 							Name:  "TARGET_PORT",
-							Value: "80", // or whatever port your service function listens on
+							Value: portStr,
 						},
 					},
 				},
@@ -239,9 +240,7 @@ func (r *ServiceFunctionChainReconciler) createOrUpdateINGRESSPod(ctx context.Co
 			log.Error(err, "unable to create INGRESS pod", "pod", pod.Name)
 			return nil, err
 		}
-
 		return pod, nil
-
 	} else if err1 != nil {
 		log.Error(err1, "unable to fetch INGRESS pod", "pod", pod.Name)
 		return nil, err1
@@ -249,4 +248,41 @@ func (r *ServiceFunctionChainReconciler) createOrUpdateINGRESSPod(ctx context.Co
 
 	log.Info("INGRESS pod already exists", "pod", foundPod.Name)
 	return foundPod, nil
+}
+
+func (r *ServiceFunctionChainReconciler) getFirstFunctionServiceInfo(ctx context.Context, instance *networkingv1alpha1.ServiceFunctionChain) (string, int32, error) {
+	if len(instance.Spec.Functions) == 0 {
+		return "", 0, fmt.Errorf("no service functions defined in the chain")
+	}
+
+	firstFunc := instance.Spec.Functions[0]
+
+	var svcList corev1.ServiceList
+	err := r.List(ctx, &svcList, &client.ListOptions{
+		Namespace: instance.Namespace,
+		LabelSelector: labels.SelectorFromSet(labels.Set{
+			"sfc.comnets.io/servicefunction": firstFunc,
+		}),
+	})
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to list services for function %s: %w", firstFunc, err)
+	}
+
+	if len(svcList.Items) == 0 {
+		return "", 0, fmt.Errorf("no Service found with label sfc.comnets.io/servicefunction=%s", firstFunc)
+	}
+
+	if len(svcList.Items) > 1 {
+		return "", 0, fmt.Errorf("multiple Services found with label sfc.comnets.io/servicefunction=%s", firstFunc)
+	}
+
+	svc := svcList.Items[0]
+	if len(svc.Spec.Ports) == 0 {
+		return "", 0, fmt.Errorf("service %s has no ports defined", svc.Name)
+	}
+
+	clusterIP := svc.Spec.ClusterIP
+	port := svc.Spec.Ports[0].Port
+
+	return clusterIP, port, nil
 }

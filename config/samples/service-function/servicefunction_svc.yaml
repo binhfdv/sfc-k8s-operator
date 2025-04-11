@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: servicefunction-sample-1-service
+  labels:
+    sfc.comnets.io/servicefunction: servicefunction-sample-1
+  namespace: sfc
+spec:
+  clusterIP: 10.96.10.40
+  selector:
+    sfc.comnets.io/sf: sfc-sf-1  # match your INGRESS pod labels
+  ports:
+  - port: 5000
+    targetPort: 8082
+    nodePort: 30997
+  type: NodePort  # or LoadBalancer if you're using a cloud provider
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: servicefunction-sample-2-service
+  labels:
+    sfc.comnets.io/servicefunction: servicefunction-sample-2
+  namespace: sfc
+spec:
+  clusterIP: 10.96.10.41
+  selector:
+    sfc.comnets.io/sf: sfc-sf-2
+  ports:
+  - port: 5000
+    targetPort: 5000
+    nodePort: 30998
+  type: NodePort
