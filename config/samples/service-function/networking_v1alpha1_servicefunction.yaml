@@ -8,13 +8,18 @@ metadata:
     sfc.comnets.io/sf: sfc-sf-1
   name: servicefunction-sample-1
 spec:
-  image: ddocker122/sf1:latest
+  image: ddocker122/forwarder:latest
   resources:
     limits:
       cpu: "500m"
       memory: "256Mi"
   ports:
     - containerPort: 5000
+  hostsf:
+    name: user-defined-sf
+    image: ddocker122/sf1:latest
+    ports:
+      - containerPort: 5000
   nextsf:
     name: servicefunction-sample-2
     ports:
@@ -32,14 +37,22 @@ metadata:
     sfc.comnets.io/sf: sfc-sf-2
   name: servicefunction-sample-2
 spec:
-  image: ddocker122/dog_breed:latest
+  image: ddocker122/forwarder:latest
   resources:
     limits:
       cpu: "500m"
       memory: "256Mi"
   ports:
     - containerPort: 5000
+  hostsf:
+    name: user-defined-sf
+    image: ddocker122/sf2:latest
+    ports:
+      - containerPort: 5000
   nextsf:
+    name: servicefunction-sample-2
+    ports:
+      - containerPort: 5000
   nodeSelector:
     # sfc-role: node-b
 

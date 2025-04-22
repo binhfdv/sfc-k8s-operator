@@ -29,12 +29,19 @@ type ServiceFunctionSpec struct {
 	Image        string                      `json:"image"`
 	Resources    corev1.ResourceRequirements `json:"resources,omitempty"`
 	Ports        []corev1.ContainerPort      `json:"ports,omitempty"`
-	NextSF       NextFunction                `json:"nextsf,omitempty"`
+	HostSF       HostFunction                `json:"hostsf,omitempty"`
+	NextSF       Function                    `json:"nextsf,omitempty"`
 	NodeSelector map[string]string           `json:"nodeSelector,omitempty"`
 }
 
-type NextFunction struct {
+type Function struct {
 	Name  string                 `json:"name"`
+	Ports []corev1.ContainerPort `json:"ports,omitempty"`
+}
+
+type HostFunction struct {
+	Name  string                 `json:"name"`
+	Image string                 `json:"image"`
 	Ports []corev1.ContainerPort `json:"ports,omitempty"`
 }
 

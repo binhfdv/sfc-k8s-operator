@@ -70,68 +70,69 @@ func (r *ServiceFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		"-------------- Service Function Controller --------------\n" +
 		"=========================================================\n")
 
-	foundPod, err := r.createOrUpdateForwarderPod(ctx, instance)
+	forwarderPod, err := r.createOrUpdateForwarderPod(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Check Pod readiness before updating the Service Function Chain status
-	isReady := false
-	for _, cond := range foundPod.Status.Conditions {
-		if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
-			isReady = true
-			break
-		}
+	hostSFPod, err := r.createOrUpdateHostSFPod(ctx, instance)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
-	fmt.Println("======== pod status: ", foundPod.Status)
-	fmt.Println("======== pod phase: ", foundPod.Status.Phase)
-	fmt.Println("======== pod conditions: ", foundPod.Status.Conditions)
-	fmt.Println("======== pod: ", foundPod.Labels)
+	// Check readiness
+	forwarderReady := isPodReady(forwarderPod)
+	hostSFReady := isPodReady(hostSFPod)
+	log.Info("Forwarder Pod Ready: ", "status", forwarderReady)
+	log.Info("Host Service Function Pod Ready: ", "status", hostSFReady)
 
-	if foundPod.Status.Phase == corev1.PodPending {
-		log.Info("Pod is still pending. Waiting for containers to start...")
-		return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
-	}
+	// fmt.Println("======== pod status: ", foundPod.Status)
+	// fmt.Println("======== pod phase: ", foundPod.Status.Phase)
+	// fmt.Println("======== pod conditions: ", foundPod.Status.Conditions)
+	// fmt.Println("======== pod: ", foundPod.Labels)
 
-	if foundPod.Status.Phase == corev1.PodFailed || foundPod.Status.Phase == corev1.PodUnknown {
-		log.Error(nil, "Service Function Pod failed or unknown, recreating", "status", foundPod.Status.Phase)
+	// if foundPod.Status.Phase == corev1.PodPending {
+	// 	log.Info("Pod is still pending. Waiting for containers to start...")
+	// 	return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
+	// }
 
-		err := r.Delete(ctx, foundPod)
-		if err != nil {
-			log.Error(err, "failed to delete unhealthy Service Function pod")
-			return ctrl.Result{}, err
-		}
+	// if foundPod.Status.Phase == corev1.PodFailed || foundPod.Status.Phase == corev1.PodUnknown {
+	// 	log.Error(nil, "Service Function Pod failed or unknown, recreating", "status", foundPod.Status.Phase)
 
-		return ctrl.Result{Requeue: true}, nil
-	}
+	// 	err := r.Delete(ctx, foundPod)
+	// 	if err != nil {
+	// 		log.Error(err, "failed to delete unhealthy Service Function pod")
+	// 		return ctrl.Result{}, err
+	// 	}
+
+	// 	return ctrl.Result{Requeue: true}, nil
+	// }
 
 	updatedStatus := instance.Status.DeepCopy()
 	updatedStatus.LastUpdated = metav1.Now()
 
-	if isReady && foundPod.Status.Phase == corev1.PodRunning {
-		log.Info("All conditions met, marking Service Function as Ready")
-		updatedStatus.PodName = foundPod.Name
+	if forwarderReady && hostSFReady {
+		log.Info("Both forwarder and host service function pods are ready")
 		updatedStatus.Ready = true
+		updatedStatus.PodName = forwarderPod.Name // Optional: track both names if needed
 	} else {
-		log.Info("Not all conditions met, marking Service Function as Not Ready")
+		log.Info("Waiting for both pods to be ready")
 		updatedStatus.Ready = false
 	}
 
-	// Only update if something actually changed
 	if instance.Status.Ready != updatedStatus.Ready ||
 		instance.Status.PodName != updatedStatus.PodName ||
 		!instance.Status.LastUpdated.Equal(&updatedStatus.LastUpdated) {
 
 		instance.Status = *updatedStatus
-		err = r.Status().Update(ctx, instance)
-		if err != nil {
-			log.Error(err, "unable to update Service Function Chain status")
+		if err := r.Status().Update(ctx, instance); err != nil {
+			log.Error(err, "unable to update ServiceFunction status")
 			return ctrl.Result{}, err
 		}
 	}
 
-	return ctrl.Result{}, nil
+	// return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -174,19 +175,78 @@ func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Conte
 	err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, foundPod)
 
 	if err != nil && errors.IsNotFound(err) {
-		log.Info("Creating Service Function pod", "pod", pod.Name)
+		log.Info("Creating Forwarder pod", "pod", pod.Name)
 		if err := r.Create(ctx, pod); err != nil {
-			log.Error(err, "unable to create Service Function pod", "pod", pod.Name)
+			log.Error(err, "unable to create Forwarder pod", "pod", pod.Name)
 			return nil, err
 		}
 
 		return pod, nil
 
 	} else if err != nil {
-		log.Error(err, "unable to fetch Service Function pod", "pod", pod.Name)
+		log.Error(err, "unable to fetch Forwarder pod", "pod", pod.Name)
 		return nil, err
 	}
 
-	log.Info("Service Function pod already exists", "pod", foundPod.Name)
+	log.Info("Forwarder pod already exists", "pod", foundPod.Name)
 	return foundPod, nil
+}
+
+func (r *ServiceFunctionReconciler) createOrUpdateHostSFPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunction) (*corev1.Pod, error) {
+	log := logf.FromContext(ctx)
+
+	podName := fmt.Sprintf("%s-hostsf", instance.Name)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: instance.Namespace,
+			Labels: map[string]string{
+				"app": "hostsf",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  instance.Spec.HostSF.Name,
+					Image: instance.Spec.HostSF.Image,
+					Ports: instance.Spec.HostSF.Ports,
+				},
+			},
+			NodeSelector: instance.Spec.NodeSelector,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(instance, pod, r.Scheme); err != nil {
+		log.Error(err, "unable to set controller reference on hostsf pod")
+		return nil, err
+	}
+
+	found := &corev1.Pod{}
+	err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
+	if err != nil && errors.IsNotFound(err) {
+		log.Info("Creating host service function pod", "pod", pod.Name)
+		if err := r.Create(ctx, pod); err != nil {
+			log.Error(err, "failed to create hostsf pod")
+			return nil, err
+		}
+		return pod, nil
+	} else if err != nil {
+		log.Error(err, "failed to fetch hostsf pod")
+		return nil, err
+	}
+
+	log.Info("Host service function pod already exists", "pod", found.Name)
+	return found, nil
+}
+
+func isPodReady(pod *corev1.Pod) bool {
+	if pod.Status.Phase != corev1.PodRunning {
+		return false
+	}
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }

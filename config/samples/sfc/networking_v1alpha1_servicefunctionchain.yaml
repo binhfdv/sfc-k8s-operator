@@ -16,6 +16,7 @@ spec:
   functions:
     - servicefunction-sample-1
     - servicefunction-sample-2
+  
   ingressInterface: eth0
   egressInterface: eth0
 ---
