@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	networkingv1alpha1 "github.com/binhfdv/sfc-k8s-operator/api/v1alpha1"
@@ -147,6 +148,60 @@ func (r *ServiceFunctionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunction) (*corev1.Pod, error) {
 	log := logf.FromContext(ctx).WithValues("servicefunction", instance.Namespace)
 
+	var clusterIP string
+	var targetPort int32
+
+	// Get all SFCs and use the first one
+	sfcList := &networkingv1alpha1.ServiceFunctionChainList{}
+	if err := r.List(ctx, sfcList); err != nil {
+		log.Error(err, "failed to list ServiceFunctionChains")
+		return nil, err
+	}
+
+	var sfList []string
+	if len(sfcList.Items) > 0 {
+		sfList = sfcList.Items[0].Spec.Functions
+	}
+
+	// Decide the forwarding target
+	if len(sfList) == 0 && instance.Spec.NextSF.Name == "" {
+		return nil, fmt.Errorf("no service functions defined in the chain and no next service function specified")
+	} else if instance.Spec.NextSF.Name != "" {
+		// Explicit nextSF provided
+		targetHost := instance.Spec.NextSF.Name
+		var err error
+		clusterIP, targetPort, err = r.getFunctionServiceInfo(ctx, instance.Namespace, targetHost)
+		if err != nil {
+			log.Error(err, "failed to get next Service Function's service info")
+			return nil, err
+		}
+	} else {
+		// Use the next function from the SFC list
+		sfIndexMap := make(map[string]int)
+		for i, sf := range sfList {
+			sfIndexMap[sf] = i
+		}
+
+		if index, ok := sfIndexMap[instance.Name]; ok && index+1 < len(sfList) {
+			targetHost := sfList[index+1]
+			var err error
+			clusterIP, targetPort, err = r.getFunctionServiceInfo(ctx, instance.Namespace, targetHost)
+			if err != nil {
+				log.Error(err, "failed to get next Service Function's service info")
+				return nil, err
+			}
+		} else {
+			log.Info("Current service function is last in chain or not found")
+			// Optionally, return nil here or let the forwarder do nothing
+			clusterIP = "127.0.0.1"
+			targetPort = 80
+		}
+	}
+
+	// Convert port to string
+	portStr := fmt.Sprintf("%d", targetPort)
+
+	// Create pod spec
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
@@ -159,13 +214,22 @@ func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Conte
 					Name:  instance.Name,
 					Image: instance.Spec.Image,
 					Ports: instance.Spec.Ports,
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TARGET_HOST",
+							Value: clusterIP,
+						},
+						{
+							Name:  "TARGET_PORT",
+							Value: portStr,
+						},
+					},
 				},
 			},
 			NodeSelector: instance.Spec.NodeSelector,
 		},
 	}
 
-	// Set the owner reference so the controller is notified on pod changes (create, delete, update)
 	if err := controllerutil.SetControllerReference(instance, pod, r.Scheme); err != nil {
 		log.Error(err, "unable to set controller reference on pod")
 		return nil, err
@@ -173,16 +237,13 @@ func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Conte
 
 	foundPod := &corev1.Pod{}
 	err := r.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, foundPod)
-
 	if err != nil && errors.IsNotFound(err) {
 		log.Info("Creating Forwarder pod", "pod", pod.Name)
 		if err := r.Create(ctx, pod); err != nil {
 			log.Error(err, "unable to create Forwarder pod", "pod", pod.Name)
 			return nil, err
 		}
-
 		return pod, nil
-
 	} else if err != nil {
 		log.Error(err, "unable to fetch Forwarder pod", "pod", pod.Name)
 		return nil, err
@@ -191,6 +252,7 @@ func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Conte
 	log.Info("Forwarder pod already exists", "pod", foundPod.Name)
 	return foundPod, nil
 }
+
 
 func (r *ServiceFunctionReconciler) createOrUpdateHostSFPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunction) (*corev1.Pod, error) {
 	log := logf.FromContext(ctx)
@@ -249,4 +311,32 @@ func isPodReady(pod *corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+
+func (r *ServiceFunctionReconciler) getFunctionServiceInfo(ctx context.Context, namespace string, targetHost string) (string, int32, error) {
+	var svcList corev1.ServiceList
+	err := r.List(ctx, &svcList, &client.ListOptions{
+		Namespace: namespace,
+		LabelSelector: labels.SelectorFromSet(labels.Set{
+			"sfc.comnets.io/servicefunction": targetHost,
+		}),
+	})
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to list services for function %s: %w", targetHost, err)
+	}
+
+	if len(svcList.Items) == 0 {
+		return "", 0, fmt.Errorf("no Service found with label sfc.comnets.io/servicefunction=%s", targetHost)
+	}
+	if len(svcList.Items) > 1 {
+		return "", 0, fmt.Errorf("multiple Services found with label sfc.comnets.io/servicefunction=%s", targetHost)
+	}
+
+	svc := svcList.Items[0]
+	if len(svc.Spec.Ports) == 0 {
+		return "", 0, fmt.Errorf("service %s has no ports defined", svc.Name)
+	}
+
+	return svc.Spec.ClusterIP, svc.Spec.Ports[0].Port, nil
 }

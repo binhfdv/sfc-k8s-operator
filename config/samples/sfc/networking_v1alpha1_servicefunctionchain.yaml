@@ -28,7 +28,7 @@ metadata:
 spec:
   clusterIP: 10.96.10.30
   selector:
-    sfc.comnets.io/name: sfc-service-function-chain  # match your INGRESS pod labels
+    sfc.comnets.io/name: sfc-service-function-chain  # match your pod labels
   ports:
   - port: 5000
     targetPort: 8080
