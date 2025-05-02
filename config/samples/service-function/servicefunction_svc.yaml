@@ -28,6 +28,40 @@ spec:
     sfc.comnets.io/sf: sfc-sf-2
   ports:
   - port: 5000
-    targetPort: 5000
+    targetPort: 8082
     nodePort: 30998
   type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: servicefunction-sample-1-service
+  labels:
+    sfc.comnets.io/servicefunction: servicefunction-sample-1
+  namespace: sfc
+spec:
+  clusterIP: 10.96.10.42
+  selector:
+    app: sfc-sf-1  # match your SF pod labels
+  ports:
+  - port: 5000
+    targetPort: 8083
+    nodePort: 30999
+  type: NodePort  # or LoadBalancer if you're using a cloud provider
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: servicefunction-sample-1-service
+  labels:
+    sfc.comnets.io/servicefunction: servicefunction-sample-2
+  namespace: sfc
+spec:
+  clusterIP: 10.96.10.43
+  selector:
+    app: sfc-sf-2  # match your SF pod labels
+  ports:
+  - port: 5000
+    targetPort: 8083
+    nodePort: 31000
+  type: NodePort  # or LoadBalancer if you're using a cloud provider

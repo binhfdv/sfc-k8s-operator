@@ -197,6 +197,11 @@ func (r *ServiceFunctionChainReconciler) createOrUpdateINGRESSPod(ctx context.Co
 	// Convert the port to string
 	portStr := fmt.Sprintf("%d", port)
 
+	println("========SFC CONTROLLER========")
+	println("ingress name: ", instance.Name)
+	println("SF - targetHost: ", clusterIP)
+	println("SF - targetPort: ", portStr)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,

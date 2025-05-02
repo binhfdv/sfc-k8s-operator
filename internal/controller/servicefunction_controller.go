@@ -148,8 +148,17 @@ func (r *ServiceFunctionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunction) (*corev1.Pod, error) {
 	log := logf.FromContext(ctx).WithValues("servicefunction", instance.Namespace)
 
-	var clusterIP string
-	var targetPort int32
+	var clusterIP, appClusterIP string
+	var targetPort, appTargetPort int32
+	var err1 error
+
+	// Get the SF app service info
+	appHost := instance.Spec.HostSF.Name
+	appClusterIP, appTargetPort, err1 = r.getFunctionServiceInfo(ctx, instance.Namespace, appHost)
+	if err1 != nil {
+		log.Error(err1, "failed to get host Service Function's service info")
+		return nil, err1
+	}
 
 	// Get all SFCs and use the first one
 	sfcList := &networkingv1alpha1.ServiceFunctionChainList{}
@@ -172,7 +181,7 @@ func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Conte
 		var err error
 		clusterIP, targetPort, err = r.getFunctionServiceInfo(ctx, instance.Namespace, targetHost)
 		if err != nil {
-			log.Error(err, "failed to get next Service Function's service info")
+			log.Error(err, "failed to get next fwd Service Function's service info")
 			return nil, err
 		}
 	} else {
@@ -187,20 +196,25 @@ func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Conte
 			var err error
 			clusterIP, targetPort, err = r.getFunctionServiceInfo(ctx, instance.Namespace, targetHost)
 			if err != nil {
-				log.Error(err, "failed to get next Service Function's service info")
+				log.Error(err, "failed to get next fwd Service Function's service info")
 				return nil, err
 			}
 		} else {
 			log.Info("Current service function is last in chain or not found")
 			// Optionally, return nil here or let the forwarder do nothing
-			clusterIP = "127.0.0.1"
+			clusterIP = "x.x.x.x"
 			targetPort = 80
 		}
 	}
 
 	// Convert port to string
 	portStr := fmt.Sprintf("%d", targetPort)
+	appPort := fmt.Sprintf("%d", appTargetPort)
 
+	println("========SF CONTROLLER========")
+	println("fwd name: ", instance.Name)
+	println("SF - targetHost: ", clusterIP)
+	println("SF - targetPort: ", portStr)
 	// Create pod spec
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -222,6 +236,14 @@ func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Conte
 						{
 							Name:  "TARGET_PORT",
 							Value: portStr,
+						},
+						{
+							Name:  "APP_HOST",
+							Value: appClusterIP,
+						},
+						{
+							Name:  "APP_PORT",
+							Value: appPort,
 						},
 					},
 				},
@@ -253,17 +275,16 @@ func (r *ServiceFunctionReconciler) createOrUpdateForwarderPod(ctx context.Conte
 	return foundPod, nil
 }
 
-
 func (r *ServiceFunctionReconciler) createOrUpdateHostSFPod(ctx context.Context, instance *networkingv1alpha1.ServiceFunction) (*corev1.Pod, error) {
 	log := logf.FromContext(ctx)
 
-	podName := fmt.Sprintf("%s-hostsf", instance.Name)
+	podName := fmt.Sprintf("%s-hostsf", instance.Spec.HostSF.Name)
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: instance.Namespace,
 			Labels: map[string]string{
-				"app": "hostsf",
+				"app": instance.GetLabels()["sfc.comnets.io/sf"],
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -312,7 +333,6 @@ func isPodReady(pod *corev1.Pod) bool {
 	}
 	return false
 }
-
 
 func (r *ServiceFunctionReconciler) getFunctionServiceInfo(ctx context.Context, namespace string, targetHost string) (string, int32, error) {
 	var svcList corev1.ServiceList

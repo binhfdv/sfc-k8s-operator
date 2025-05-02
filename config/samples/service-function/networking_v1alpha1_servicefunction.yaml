@@ -16,14 +16,14 @@ spec:
   ports:
     - containerPort: 5000
   hostsf:
-    name: user-defined-sf
-    image: ddocker122/sf1:latest
+    name: user-defined-sf-1
+    image: ddocker122/app:latest
     ports:
       - containerPort: 5000
   nextsf:
-    name: servicefunction-sample-2
-    ports:
-      - containerPort: 5000
+    # name: servicefunction-sample-2
+    # ports:
+    #   - containerPort: 5000
   nodeSelector:
     # sfc-role: node-a
 ---
@@ -45,14 +45,14 @@ spec:
   ports:
     - containerPort: 5000
   hostsf:
-    name: user-defined-sf
-    image: ddocker122/sf2:latest
+    name: user-defined-sf-2
+    image: ddocker122/app:latest
     ports:
       - containerPort: 5000
   nextsf:
-    name: servicefunction-sample-2
-    ports:
-      - containerPort: 5000
+    # name: servicefunction-sample-2
+    # ports:
+    #   - containerPort: 5000
   nodeSelector:
     # sfc-role: node-b
 
