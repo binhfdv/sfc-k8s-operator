@@ -35,9 +35,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: servicefunction-sample-1-service
+  name: user-defined-sf-1-service
   labels:
-    sfc.comnets.io/servicefunction: servicefunction-sample-1
+    sfc.comnets.io/servicefunction: user-defined-sf-1
   namespace: sfc
 spec:
   clusterIP: 10.96.10.42
@@ -52,9 +52,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: servicefunction-sample-1-service
+  name: user-defined-sf-2-service
   labels:
-    sfc.comnets.io/servicefunction: servicefunction-sample-2
+    sfc.comnets.io/servicefunction: user-defined-sf-2
   namespace: sfc
 spec:
   clusterIP: 10.96.10.43
@@ -64,4 +64,21 @@ spec:
   - port: 5000
     targetPort: 8083
     nodePort: 31000
+  type: NodePort  # or LoadBalancer if you're using a cloud provider
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: destination-app-service
+  labels:
+    sfc.comnets.io/servicefunction: destination-app
+  namespace: sfc
+spec:
+  clusterIP: 10.96.10.50
+  selector:
+    app: destination-app  # match your SF pod labels
+  ports:
+  - port: 5000
+    targetPort: 8083
+    nodePort: 31001
   type: NodePort  # or LoadBalancer if you're using a cloud provider

@@ -43,6 +43,10 @@ spec:
                 properties:
                   image:
                     type: string
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
                   name:
                     type: string
                   ports:

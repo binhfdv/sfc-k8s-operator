@@ -40,10 +40,16 @@ type Function struct {
 }
 
 type HostFunction struct {
-	Name  string                 `json:"name"`
-	Image string                 `json:"image"`
-	Ports []corev1.ContainerPort `json:"ports,omitempty"`
+	Name   string                 `json:"name"`
+	Image  string                 `json:"image"`
+	Ports  []corev1.ContainerPort `json:"ports,omitempty"`
+	Labels map[string]string      `json:"labels,omitempty"`
 }
+
+// type Label struct {
+// 	Key   string `json:"key"`
+// 	Value string `json:"value"`
+// }
 
 // ServiceFunctionStatus defines the observed state of ServiceFunction.
 type ServiceFunctionStatus struct {

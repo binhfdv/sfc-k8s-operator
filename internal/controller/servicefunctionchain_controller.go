@@ -92,16 +92,6 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 		}
 	}
 
-	// if !isReady && foundPod.Status.Phase == corev1.PodRunning {
-	// 	// You can decide to wait or delete
-	// 	log.Info("Pod is running but not ready. Requeuing...")
-	// 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	// }
-	fmt.Println("======== pod status: ", foundPod.Status)
-	fmt.Println("======== pod phase: ", foundPod.Status.Phase)
-	fmt.Println("======== pod conditions: ", foundPod.Status.Conditions)
-	fmt.Println("======== pod: ", foundPod.Labels)
-
 	if foundPod.Status.Phase == corev1.PodPending {
 		log.Info("Pod is still pending. Waiting for containers to start...")
 		return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
@@ -144,7 +134,7 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
