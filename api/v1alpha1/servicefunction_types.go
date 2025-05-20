@@ -40,10 +40,16 @@ type Function struct {
 }
 
 type HostFunction struct {
-	Name   string                 `json:"name"`
-	Image  string                 `json:"image"`
-	Ports  []corev1.ContainerPort `json:"ports,omitempty"`
-	Labels map[string]string      `json:"labels,omitempty"`
+	Name               string                      `json:"name"`
+	Image              string                      `json:"image"`
+	Ports              []corev1.ContainerPort      `json:"ports,omitempty"`
+	Env                []corev1.EnvVar             `json:"env,omitempty"`
+	VolumeMounts       []corev1.VolumeMount        `json:"volumeMounts,omitempty"`
+	Volumes            []corev1.Volume             `json:"volumes,omitempty"`
+	ImagePullPolicy    corev1.PullPolicy           `json:"imagePullPolicy,omitempty"`
+	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
+	Resources          corev1.ResourceRequirements `json:"resources,omitempty"`
+	Labels             map[string]string           `json:"labels,omitempty"`
 }
 
 // type Label struct {

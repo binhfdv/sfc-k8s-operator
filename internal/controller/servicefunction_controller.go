@@ -71,12 +71,12 @@ func (r *ServiceFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		"-------------- Service Function Controller --------------\n" +
 		"=========================================================\n")
 
-	forwarderPod, err := r.createOrUpdateForwarderPod(ctx, instance)
+	hostSFPod, err := r.createOrUpdateHostSFPod(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	hostSFPod, err := r.createOrUpdateHostSFPod(ctx, instance)
+	forwarderPod, err := r.createOrUpdateForwarderPod(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -267,11 +267,16 @@ func (r *ServiceFunctionReconciler) createOrUpdateHostSFPod(ctx context.Context,
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:  instance.Spec.HostSF.Name,
-					Image: instance.Spec.HostSF.Image,
-					Ports: instance.Spec.HostSF.Ports,
+					Name:            instance.Spec.HostSF.Name,
+					Image:           instance.Spec.HostSF.Image,
+					ImagePullPolicy: instance.Spec.HostSF.ImagePullPolicy,
+					Ports:           instance.Spec.HostSF.Ports,
+					Env:             instance.Spec.HostSF.Env,
+					VolumeMounts:    instance.Spec.HostSF.VolumeMounts,
+					Resources:       instance.Spec.HostSF.Resources,
 				},
 			},
+			Volumes:      instance.Spec.HostSF.Volumes,
 			NodeSelector: instance.Spec.NodeSelector,
 		},
 	}

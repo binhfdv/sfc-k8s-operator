@@ -1,3 +1,6 @@
+##################################################################################################
+# Productpage pod
+##################################################################################################
 apiVersion: networking.sfc.comnets.com/v1alpha1
 kind: ServiceFunction
 metadata:
@@ -18,17 +21,22 @@ spec:
   hostsf:
     labels:
       app: sfc-sf-1
-    name: user-defined-sf-1
-    image: ddocker122/app:latest
+    name: productpage
+    serviceAccountName: bookinfo-productpage
+    image: docker.io/istio/examples-bookinfo-productpage-v1:1.20.3
+    imagePullPolicy: IfNotPresent
     ports:
-      - containerPort: 5000
-  nextsf:
-    # name: servicefunction-sample-2
-    # ports:
-    #   - containerPort: 5000
-  nodeSelector:
-    # sfc-role: node-a
+    - containerPort: 9080
+    volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+    volumes:
+    - name: tmp
+      emptyDir: {}
 ---
+##################################################################################################
+# Details pod
+##################################################################################################
 apiVersion: networking.sfc.comnets.com/v1alpha1
 kind: ServiceFunction
 metadata:
@@ -49,14 +57,133 @@ spec:
   hostsf:
     labels:
       app: sfc-sf-2
-    name: user-defined-sf-2
-    image: ddocker122/app:latest
+    name: details
+    serviceAccountName: bookinfo-details
+    image: docker.io/istio/examples-bookinfo-details-v1:1.20.3
+    imagePullPolicy: IfNotPresent
     ports:
-      - containerPort: 5000
+    - containerPort: 9080
   nextsf:
-    name: destination-app
+    # name: servicefunction-sample-2
     # ports:
     #   - containerPort: 5000
   nodeSelector:
-    # sfc-role: node-b
+    # sfc-role: node-a
+---
+# ##################################################################################################
+# # Ratings pod
+# ##################################################################################################
+# apiVersion: networking.sfc.comnets.com/v1alpha1
+# kind: ServiceFunction
+# metadata:
+#   labels:
+#     app.kubernetes.io/name: sfc-k8s-operator
+#     app.kubernetes.io/managed-by: kustomize
+#     sfc.comnets.io/name: sfc-service-function
+#     sfc.comnets.io/sf: sfc-sf-3
+#   name: servicefunction-sample-3
+# spec:
+#   image: ddocker122/forwarder:latest
+#   resources:
+#     limits:
+#       cpu: "500m"
+#       memory: "256Mi"
+#   ports:
+#     - containerPort: 5000
+#   hostsf:
+#     labels:
+#       app: sfc-sf-3
+#     name: ratings
+#     serviceAccountName: bookinfo-ratings
+#     image: docker.io/istio/examples-bookinfo-ratings-v1:1.20.3
+#     imagePullPolicy: IfNotPresent
+#     ports:
+#       - containerPort: 9080
+#   nextsf:
+#     # name: servicefunction-sample-2
+#     # ports:
+#     #   - containerPort: 5000
+#   nodeSelector:
+#     # sfc-role: node-a
+# ---
+# ##################################################################################################
+# # Reviews pod
+# ##################################################################################################
+# apiVersion: networking.sfc.comnets.com/v1alpha1
+# kind: ServiceFunction
+# metadata:
+#   labels:
+#     app.kubernetes.io/name: sfc-k8s-operator
+#     app.kubernetes.io/managed-by: kustomize
+#     sfc.comnets.io/name: sfc-service-function
+#     sfc.comnets.io/sf: sfc-sf-4
+#   name: servicefunction-sample-4
+# spec:
+#   image: ddocker122/forwarder:latest
+#   resources:
+#     limits:
+#       cpu: "500m"
+#       memory: "256Mi"
+#   ports:
+#     - containerPort: 5000
+#   hostsf:
+#     labels:
+#       app: sfc-sf-4
+#     name: reviews
+#     image: docker.io/istio/examples-bookinfo-reviews-v3:1.20.3
+#     imagePullPolicy: IfNotPresent
+#     serviceAccountName: bookinfo-reviews
+#     env:
+#     - name: LOG_DIR
+#       value: "/tmp/logs"
+#     ports:
+#     - containerPort: 9080
+#     volumeMounts:
+#     - name: tmp
+#       mountPath: /tmp
+#     - name: wlp-output
+#       mountPath: /opt/ibm/wlp/output
+#     volumes:
+#     - name: wlp-output
+#       emptyDir: {}
+#     - name: tmp
+#       emptyDir: {}
+#   nextsf:
+#     # name: servicefunction-sample-2
+#     # ports:
+#     #   - containerPort: 5000
+#   nodeSelector:
+#     # sfc-role: node-a
+# ---
+
+# apiVersion: networking.sfc.comnets.com/v1alpha1
+# kind: ServiceFunction
+# metadata:
+#   labels:
+#     app.kubernetes.io/name: sfc-k8s-operator
+#     app.kubernetes.io/managed-by: kustomize
+#     sfc.comnets.io/name: sfc-service-function
+#     sfc.comnets.io/sf: sfc-sf-2
+#   name: servicefunction-sample-2
+# spec:
+#   image: ddocker122/forwarder:latest
+#   resources:
+#     limits:
+#       cpu: "500m"
+#       memory: "256Mi"
+#   ports:
+#     - containerPort: 5000
+#   hostsf:
+#     labels:
+#       app: sfc-sf-2
+#     name: user-defined-sf-2
+#     image: ddocker122/app:latest
+#     ports:
+#       - containerPort: 5000
+#   nextsf:
+#     name: destination-app
+#     # ports:
+#     #   - containerPort: 5000
+#   nodeSelector:
+#     # sfc-role: node-b
 

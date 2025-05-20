@@ -2,5 +2,5 @@
 resources:
 - networking_v1alpha1_servicefunction.yaml
 - servicefunction_svc.yaml
-- destination_app.yaml
+# - destination_app.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

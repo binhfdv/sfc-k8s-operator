@@ -73,12 +73,12 @@ func (r *ServiceFunctionChainReconciler) Reconcile(ctx context.Context, req ctrl
 		"------------ Service Function Chain Controller ----------\n" +
 		"=========================================================\n")
 
-	deployedFunctions, err := r.checkServiceFunctionsReady(ctx, req.Namespace, instance.Spec.Functions)
+	foundPod, err := r.createOrUpdateINGRESSPod(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	foundPod, err := r.createOrUpdateINGRESSPod(ctx, instance)
+	deployedFunctions, err := r.checkServiceFunctionsReady(ctx, req.Namespace, instance.Spec.Functions)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

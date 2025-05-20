@@ -1,84 +1,265 @@
+# Copyright Istio Authors
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+##################################################################################################
+# Productpage services
+##################################################################################################
 apiVersion: v1
 kind: Service
 metadata:
-  name: servicefunction-sample-1-service
+  name: productpage
+  labels:
+    sfc.comnets.io/servicefunction: productpage
+    service: productpage
+  namespace: sfc
+spec:
+  clusterIP: 10.96.10.41
+  type: NodePort
+  ports:
+  - port: 9080
+    targetPort: 9080
+    nodePort: 31000
+  selector:
+    app: sfc-sf-1
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bookinfo-productpage
+  labels:
+    account: productpage
+  namespace: sfc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: productpage-fwd
   labels:
     sfc.comnets.io/servicefunction: servicefunction-sample-1
   namespace: sfc
 spec:
-  clusterIP: 10.96.10.40
+  clusterIP: 10.96.10.51
   selector:
     sfc.comnets.io/sf: sfc-sf-1  # match your SF pod labels
   ports:
   - port: 5000
     targetPort: 8082
-    nodePort: 30997
+    nodePort: 32000
   type: NodePort  # or LoadBalancer if you're using a cloud provider
+---
+##################################################################################################
+# Details service
+##################################################################################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: details
+  labels:
+    sfc.comnets.io/servicefunction: details
+    service: details
+  namespace: sfc
+spec:
+  clusterIP: 10.96.10.42
+  type: NodePort
+  ports:
+  - port: 9080
+    targetPort: 9080
+    nodePort: 31001
+  selector:
+    app: sfc-sf-2
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bookinfo-details
+  labels:
+    account: details
+  namespace: sfc
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: servicefunction-sample-2-service
+  name: details-fwd
   labels:
     sfc.comnets.io/servicefunction: servicefunction-sample-2
   namespace: sfc
 spec:
-  clusterIP: 10.96.10.41
+  clusterIP: 10.96.10.52
   selector:
-    sfc.comnets.io/sf: sfc-sf-2
+    sfc.comnets.io/sf: sfc-sf-2  # match your SF pod labels
   ports:
   - port: 5000
     targetPort: 8082
-    nodePort: 30998
-  type: NodePort
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: user-defined-sf-1-service
-  labels:
-    sfc.comnets.io/servicefunction: user-defined-sf-1
-  namespace: sfc
-spec:
-  clusterIP: 10.96.10.42
-  selector:
-    app: sfc-sf-1  # match your SF pod labels
-  ports:
-  - port: 5000
-    targetPort: 8083
-    nodePort: 30999
+    nodePort: 32001
   type: NodePort  # or LoadBalancer if you're using a cloud provider
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: user-defined-sf-2-service
-  labels:
-    sfc.comnets.io/servicefunction: user-defined-sf-2
-  namespace: sfc
-spec:
-  clusterIP: 10.96.10.43
-  selector:
-    app: sfc-sf-2  # match your SF pod labels
-  ports:
-  - port: 5000
-    targetPort: 8083
-    nodePort: 31000
-  type: NodePort  # or LoadBalancer if you're using a cloud provider
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: destination-app-service
-  labels:
-    sfc.comnets.io/servicefunction: destination-app
-  namespace: sfc
-spec:
-  clusterIP: 10.96.10.50
-  selector:
-    app: destination-app  # match your SF pod labels
-  ports:
-  - port: 5000
-    targetPort: 8083
-    nodePort: 31001
-  type: NodePort  # or LoadBalancer if you're using a cloud provider
+# ##################################################################################################
+# # Ratings service
+# ##################################################################################################
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: ratings
+#   labels:
+#     sfc.comnets.io/servicefunction: servicefunction-sample-3
+#     service: ratings
+#   namespace: sfc
+# spec:
+#   clusterIP: 10.96.10.43
+#   type: NodePort
+#   ports:
+#   - port: 9080
+#     targetPort: 9080
+#     nodePort: 31002
+#   selector:
+#     app: sfc-sf-3
+# ---
+# apiVersion: v1
+# kind: ServiceAccount
+# metadata:
+#   name: bookinfo-ratings
+#   labels:
+#     account: ratings
+#   namespace: sfc
+# ---
+# ##################################################################################################
+# # Reviews service
+# ##################################################################################################
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: reviews
+#   labels:
+#     sfc.comnets.io/servicefunction: servicefunction-sample-4
+#     service: reviews
+#   namespace: sfc
+# spec:
+#   clusterIP: 10.96.10.44
+#   type: NodePort
+#   ports:
+#   - port: 9080
+#     targetPort: 9080
+#     nodePort: 31003
+#   selector:
+#     app: sfc-sf-4
+# ---
+# apiVersion: v1
+# kind: ServiceAccount
+# metadata:
+#   name: bookinfo-reviews
+#   labels:
+#     account: reviews
+#   namespace: sfc
+# ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##################################################################################################
+
+
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: servicefunction-sample-1-service
+#   labels:
+#     sfc.comnets.io/servicefunction: servicefunction-sample-1
+#   namespace: sfc
+# spec:
+#   clusterIP: 10.96.10.40
+#   selector:
+#     sfc.comnets.io/sf: sfc-sf-1  # match your SF pod labels
+#   ports:
+#   - port: 5000
+#     targetPort: 8082
+#     nodePort: 30997
+#   type: NodePort  # or LoadBalancer if you're using a cloud provider
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: servicefunction-sample-2-service
+#   labels:
+#     sfc.comnets.io/servicefunction: servicefunction-sample-2
+#   namespace: sfc
+# spec:
+#   clusterIP: 10.96.10.41
+#   selector:
+#     sfc.comnets.io/sf: sfc-sf-2
+#   ports:
+#   - port: 5000
+#     targetPort: 8082
+#     nodePort: 30998
+#   type: NodePort
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: user-defined-sf-1-service
+#   labels:
+#     sfc.comnets.io/servicefunction: user-defined-sf-1
+#   namespace: sfc
+# spec:
+#   clusterIP: 10.96.10.42
+#   selector:
+#     app: sfc-sf-1  # match your SF pod labels
+#   ports:
+#   - port: 5000
+#     targetPort: 8083
+#     nodePort: 30999
+#   type: NodePort  # or LoadBalancer if you're using a cloud provider
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: user-defined-sf-2-service
+#   labels:
+#     sfc.comnets.io/servicefunction: user-defined-sf-2
+#   namespace: sfc
+# spec:
+#   clusterIP: 10.96.10.43
+#   selector:
+#     app: sfc-sf-2  # match your SF pod labels
+#   ports:
+#   - port: 5000
+#     targetPort: 8083
+#     nodePort: 31000
+#   type: NodePort  # or LoadBalancer if you're using a cloud provider
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: destination-app-service
+#   labels:
+#     sfc.comnets.io/servicefunction: destination-app
+#   namespace: sfc
+# spec:
+#   clusterIP: 10.96.10.50
+#   selector:
+#     app: destination-app  # match your SF pod labels
+#   ports:
+#   - port: 5000
+#     targetPort: 8083
+#     nodePort: 31001
+#   type: NodePort  # or LoadBalancer if you're using a cloud provider
